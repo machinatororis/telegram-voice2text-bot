@@ -1,6 +1,7 @@
 .idea/
 .venv/
 .env
+data/
 logs/
 
 # User-specific stuff
