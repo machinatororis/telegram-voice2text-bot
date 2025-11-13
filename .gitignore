@@ -1,5 +1,6 @@
 .idea/
 .venv/
+.env
 
 # User-specific stuff
 .idea/**/workspace.xml
