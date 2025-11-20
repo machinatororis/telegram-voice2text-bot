@@ -7,8 +7,9 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 
-from utils.audio import convert_audio_bytes
-from config import get_settings  # 👈 берём конфиг отсюда
+from app.utils.audio import convert_audio_bytes
+from app.utils.transcribe import transcribe_wav_bytes
+from app.config import get_settings  # 👈 берём конфиг отсюда
 
 
 async def transcribe_bytes(
@@ -18,11 +19,9 @@ async def transcribe_bytes(
     filename: str | None = None,
 ) -> str:
     """
-    Принимает «сырые» байты аудио (ogg/opus из Телеги),
+    Принимает «сырые» байты аудио (ogg/opus из Телеграм),
     конвертирует их в WAV 16 kHz mono через ffmpeg (convert_audio_bytes),
-    а потом (позже) будет отправлять в движок распознавания.
-
-    Сейчас распознавание — заглушка, но конвертация уже настоящая.
+    а потом отправляет в локальный движок распознавания (Whisper).
     """
     if not data:
         return "Я получила пустое аудио 🤔"
@@ -34,11 +33,10 @@ async def transcribe_bytes(
         len(data),
     )
 
+    # 1. OGG/MP3/MP4 → WAV 16k mono (in-memory)
     try:
-        # 1. Конвертация OGG/OPUS → WAV 16 kHz mono в памяти
         wav_bytes = convert_audio_bytes(data)
     except Exception as e:
-        # Если что-то пошло не так — логируем стек и возвращаем понятное сообщение
         logging.exception("Ошибка при конвертации аудио через ffmpeg")
         return f"Не удалось подготовить аудио для распознавания: {e}"
 
@@ -48,15 +46,26 @@ async def transcribe_bytes(
         len(wav_bytes),
     )
 
-    # 2. Здесь позже будет настоящий вызов движка распознавания
-    #    (Whisper / OpenAI / что выберем).
-    #    Пока вернём диагностический текст, чтобы видеть, что всё работает.
-    size_kb = len(wav_bytes) / 1024
-    return (
-        "[Черновой результат]\n"
-        f"Аудио сконвертировано в WAV (~{size_kb:.1f} КБ).\n"
-        "Распознавание текста ещё не подключено."
+    # 2. WAV → текст через Whisper
+    try:
+        text = transcribe_wav_bytes(wav_bytes)
+    except Exception:
+        logging.exception("Ошибка при распознавании аудио через Whisper")
+        return (
+            "Аудио удалось сконвертировать в WAV, "
+            "но при распознавании произошла ошибка 😔"
+        )
+
+    logging.info(
+        "Распознавание завершено: filename=%s, text_len=%d",
+        filename,
+        len(text) if text else 0,
     )
+
+    if not text.strip():
+        return "Я не смогла распознать текст в этом аудио 😔"
+
+    return text
 
 
 async def main():
