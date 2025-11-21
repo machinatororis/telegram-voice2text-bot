@@ -21,7 +21,12 @@ def transcribe_wav_bytes(wav_bytes: bytes) -> str:
             tmp_path = tmp.name  # запоминаем путь
 
         # 2. теперь файл закрыт, ffmpeg может его открыть
-        result = model.transcribe(tmp_path, language="ru", fp16=False)
+        result = model.transcribe(
+            tmp_path,
+            fp16=False,
+            temperature=0,
+            beam_size=5,
+        )
 
         return result["text"].strip()
 
