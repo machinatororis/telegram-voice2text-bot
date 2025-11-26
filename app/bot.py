@@ -75,8 +75,12 @@ async def main():
     # 2. Настраиваем логирование
     log_file = settings.log_dir / "bot.log"
 
+    # Превращаем строковый уровень ("DEBUG", "INFO", ...) в константу logging
+    log_level_name = settings.log_level.upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+
     logging.basicConfig(
-        level=logging.DEBUG if settings.debug else logging.INFO,
+        level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
             logging.FileHandler(log_file, encoding="utf-8"),
@@ -85,7 +89,8 @@ async def main():
     )
 
     logging.info("Запуск бота...")
-    logging.info("DEBUG режим: %s", settings.debug)
+    logging.info("Текущий уровень логирования: %s", log_level_name)
+    logging.info("DEBUG флаг (для информации): %s", settings.debug)
     logging.info("Логи пишутся в: %s", log_file)
 
     # 3. Создаём бота и диспетчер
