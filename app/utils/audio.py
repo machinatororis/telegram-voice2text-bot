@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def convert_to_wav_16k_file(
@@ -19,6 +22,12 @@ def convert_to_wav_16k_file(
 
     input_path = Path(input_path)
     output_path = Path(output_path)
+
+    logger.debug(
+        "Converting file to wav16k: src=%s dst=%s",
+        input_path,
+        output_path,
+    )
 
     if not input_path.is_file():
         raise FileNotFoundError(f"Входной файл не найден: {input_path}")
@@ -45,9 +54,25 @@ def convert_to_wav_16k_file(
     )
 
     if result.returncode != 0:
+        error_text = result.stderr.decode("utf-8", errors="ignore")
+
+        logger.error(
+            "ffmpeg failed in convert_to_wav_16k_file: returncode=%s, input=%s, "
+            "output=%s, stderr=%s",
+            result.returncode,
+            input_path,
+            output_path,
+            error_text[:500],  # ограничим объём для логов
+        )
         raise RuntimeError(
             f"Ошибка при вызове ffmpeg (код {result.returncode}):\n" f"{result.stderr}"
         )
+
+    logger.debug(
+        "ffmpeg conversion success (file mode). input=%s output=%s",
+        input_path,
+        output_path,
+    )
 
 
 def convert_audio_bytes(input_bytes: bytes) -> bytes:
@@ -61,6 +86,11 @@ def convert_audio_bytes(input_bytes: bytes) -> bytes:
 
     if not input_bytes:
         raise ValueError("input_bytes пустой — нечего конвертировать.")
+
+    logger.debug(
+        "Starting ffmpeg conversion from bytes. input_size=%d",
+        len(input_bytes),
+    )
 
     # Команда ffmpeg:
     # -i pipe:0            читать вход из stdin
@@ -99,10 +129,22 @@ def convert_audio_bytes(input_bytes: bytes) -> bytes:
     # ffmpeg вернул ошибку?
     if process.returncode != 0:
         error_text = stderr.decode("utf-8", errors="ignore")
+        logger.error(
+            "ffmpeg failed in convert_audio_bytes: returncode=%s, stderr=%s",
+            process.returncode,
+            error_text[:500],  # обрежем, чтобы лог не раздувался
+        )
         raise RuntimeError(f"Ошибка ffmpeg (код {process.returncode}):\n{error_text}")
 
     if not wav_bytes:
+        logger.error("ffmpeg did not return any WAV data.")
         raise RuntimeError("ffmpeg не вернул WAV данные.")
+
+    logger.debug(
+        "ffmpeg conversion success. input_size=%d, output_size=%d",
+        len(input_bytes),
+        len(wav_bytes),
+    )
 
     return wav_bytes
 
@@ -127,9 +169,9 @@ if __name__ == "__main__":
     ogg_bytes = src.read_bytes()
 
     print("Конвертирую в WAV...")
-    wav_bytes = convert_audio_bytes(ogg_bytes)
+    wav_bytes_result = convert_audio_bytes(ogg_bytes)
 
     print(f"Записываю результат в {dst}...")
-    dst.write_bytes(wav_bytes)
+    dst.write_bytes(wav_bytes_result)
 
     print("Готово! Открой .wav и послушай ☑")

@@ -10,6 +10,9 @@ from aiogram.filters import CommandStart
 from app.utils.audio import convert_audio_bytes
 from app.utils.transcribe import transcribe_wav_bytes
 from app.config import get_settings  # 👈 берём конфиг отсюда
+from app.logging_config import setup_logging
+
+logger = logging.getLogger(__name__)  # 👈 именованный логгер
 
 
 async def transcribe_bytes(
@@ -26,8 +29,8 @@ async def transcribe_bytes(
     if not data:
         return "Я получила пустое аудио 🤔"
 
-    logging.info(
-        "Начинаю обработку аудио: filename=%s, mime_type=%s, size=%d bytes",
+    logger.info(
+        "Starting audio processing: filename=%s, mime_type=%s, size=%d bytes",
         filename,
         mime_type,
         len(data),
@@ -37,11 +40,11 @@ async def transcribe_bytes(
     try:
         wav_bytes = convert_audio_bytes(data)
     except Exception as e:
-        logging.exception("Ошибка при конвертации аудио через ffmpeg")
+        logger.exception("Error converting audio using ffmpeg")
         return f"Не удалось подготовить аудио для распознавания: {e}"
 
-    logging.info(
-        "Аудио сконвертировано в WAV: filename=%s, wav_size=%d bytes",
+    logger.info(
+        "Audio converted to WAV: filename=%s, wav_size=%d bytes",
         filename,
         len(wav_bytes),
     )
@@ -50,14 +53,14 @@ async def transcribe_bytes(
     try:
         text = transcribe_wav_bytes(wav_bytes)
     except Exception:
-        logging.exception("Ошибка при распознавании аудио через Whisper")
+        logger.exception("Error during Whisper transcription")
         return (
             "Аудио удалось сконвертировать в WAV, "
             "но при распознавании произошла ошибка 😔"
         )
 
-    logging.info(
-        "Распознавание завершено: filename=%s, text_len=%d",
+    logger.info(
+        "Transcription completed: filename=%s, text_len=%d",
         filename,
         len(text) if text else 0,
     )
@@ -72,26 +75,10 @@ async def main():
     # 1. Получаем настройки
     settings = get_settings()
 
-    # 2. Настраиваем логирование
-    log_file = settings.log_dir / "bot.log"
+    # 2. Настраиваем логирование на основе этих настроек
+    setup_logging(settings)
 
-    # Превращаем строковый уровень ("DEBUG", "INFO", ...) в константу logging
-    log_level_name = settings.log_level.upper()
-    log_level = getattr(logging, log_level_name, logging.INFO)
-
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
-            logging.StreamHandler(),  # вывод в консоль
-        ],
-    )
-
-    logging.info("Запуск бота...")
-    logging.info("Текущий уровень логирования: %s", log_level_name)
-    logging.info("DEBUG флаг (для информации): %s", settings.debug)
-    logging.info("Логи пишутся в: %s", log_file)
+    logger.info("Starting bot. debug=%s", settings.debug)
 
     # 3. Создаём бота и диспетчер
     bot = Bot(token=settings.bot_token)
@@ -99,8 +86,8 @@ async def main():
 
     @dp.message(CommandStart())
     async def cmd_start(message: Message):
-        logging.info(
-            "Пользователь %s (%s) отправил /start",
+        logger.info(
+            "User %s (%s) sent /start",
             message.from_user.id,
             message.from_user.full_name,
         )
@@ -111,16 +98,19 @@ async def main():
 
     @dp.message(F.text)
     async def echo(message: Message):
-        logging.debug("Получен текст: %r", message.text)
+        logger.debug("Text message received: %r", message.text)
         await message.answer(f"Ты написал(а): {message.text}")
 
     @dp.message(F.voice | F.audio | F.video_note)
     async def on_voice(message: Message):
         user = message.from_user
-        logging.info(
-            "Получено голосовое от %s (%s), message_id=%s",
-            user.id,
-            user.full_name,
+        logger.info(
+            "Incoming voice-like message: kind=%s user_id=%s user_name=%s "
+            "chat_id=%s message_id=%s",
+            ("voice" if message.voice else "audio" if message.audio else "video_note"),
+            user.id if user else None,
+            user.full_name if user else None,
+            message.chat.id,
             message.message_id,
         )
 
@@ -143,34 +133,56 @@ async def main():
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{kind}_{message.chat.id}_{message.message_id}_{ts}{ext}"
 
-        # 1. Скачиваем в память
-        buffer = BytesIO()
-        await message.bot.download(file_obj, destination=buffer)
-        buffer.seek(0)
-        audio_bytes = buffer.getvalue()
+        try:
+            # 1. Скачиваем в память
+            buffer = BytesIO()
+            await message.bot.download(file_obj, destination=buffer)
+            buffer.seek(0)
+            audio_bytes = buffer.getvalue()
 
-        logging.debug(
-            "Скачали файл %s: размер=%d байт, mime_type=%s",
-            filename,
-            len(audio_bytes),
-            mime_type,
-        )
+            logger.debug(
+                "Downloaded file %s: size=%d bytes, mime_type=%s",
+                filename,
+                len(audio_bytes),
+                mime_type,
+            )
 
-        # 2. Кормим в transcribe_bytes — теперь там внутри будет ffmpeg → WAV
-        text = await transcribe_bytes(
-            audio_bytes,
-            mime_type=mime_type,
-            filename=filename,
-        )
+            # 2. Кормим в transcribe_bytes — теперь там внутри будет ffmpeg → WAV
+            text = await transcribe_bytes(
+                audio_bytes,
+                mime_type=mime_type,
+                filename=filename,
+            )
 
-        # 3. Отвечаем пользователю
-        await message.reply(
-            "Голосовое получено 🎧\n" f"Файл: `{filename}`\n\n" f"{text}",
-            parse_mode="Markdown",
-        )
+            # 3. Отвечаем пользователю
+            logger.info(
+                "Transcription success: user_id=%s message_id=%s text_len=%s",
+                user.id if user else None,
+                message.message_id,
+                len(text),
+            )
 
-    print("Бот запущен. Нажми Ctrl+C, чтобы остановить.")
+            await message.reply(
+                "Голосовое получено 🎧\n" f"Файл: `{filename}`\n\n" f"{text}",
+                parse_mode="Markdown",
+            )
+        except Exception:
+            # Структурное логирование ошибки
+            logger.exception(
+                "Error while handling voice message: "
+                "user_id=%s chat_id=%s message_id=%s",
+                user.id if user else None,
+                message.chat.id,
+                message.message_id,
+            )
+            await message.reply(
+                "Упс, что-то пошло не так при распознавании 😔 "
+                "Попробуй ещё раз позже."
+            )
+
+    logger.info("Bot started. Waiting for updates...")
     await dp.start_polling(bot)
+    logger.info("Bot polling stopped. Shutting down.")
 
 
 if __name__ == "__main__":
