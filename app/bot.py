@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 
-from app.utils.audio import convert_audio_bytes
+from app.utils.audio import convert_audio_bytes, check_ffmpeg_available
 from app.utils.transcribe import transcribe_wav_bytes
 from app.config import get_settings  # 👈 берём конфиг отсюда
 from app.logging_config import setup_logging
@@ -79,6 +79,15 @@ async def main():
     setup_logging(settings)
 
     logger.info("Starting bot. debug=%s", settings.debug)
+
+    # 2a. Проверяем наличие ffmpeg
+    ffmpeg_ok = check_ffmpeg_available()
+    if not ffmpeg_ok:
+        # Дополнительное пояснение в логах (WARNING уже есть внутри функции)
+        logger.warning(
+            "ffmpeg was not detected during bot startup. "
+            "Voice message conversion may not work."
+        )
 
     # 3. Создаём бота и диспетчер
     bot = Bot(token=settings.bot_token)

@@ -3,9 +3,29 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+import shutil
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def check_ffmpeg_available() -> bool:
+    """
+    Проверяет, доступен ли ffmpeg в PATH.
+    Логирует предупреждение, если ffmpeg не найден.
+    Возвращает True, если ffmpeg найден, иначе False.
+    """
+    ffmpeg_path = shutil.which("ffmpeg")
+
+    if ffmpeg_path is None:
+        logger.warning(
+            "ffmpeg not found in PATH. Audio conversion will not work until "
+            "ffmpeg is installed and added to the system PATH."
+        )
+        return False
+
+    logger.debug("ffmpeg detected at: %s", ffmpeg_path)
+    return True
 
 
 def convert_to_wav_16k_file(
@@ -46,26 +66,35 @@ def convert_to_wav_16k_file(
         str(output_path),
     ]
 
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,  # stderr уже строка
+        )
+    except FileNotFoundError as e:
+        logger.error(
+            "Не удалось запустить ffmpeg в convert_to_wav_16k_file. "
+            "Похоже, ffmpeg не установлен или не добавлен в PATH.",
+        )
+        raise RuntimeError(
+            "Не удалось запустить ffmpeg: исполняемый файл не найден. "
+            "Установите ffmpeg и добавьте его в PATH."
+        ) from e
 
     if result.returncode != 0:
-        error_text = result.stderr.decode("utf-8", errors="ignore")
-
+        error_text = result.stderr or ""
         logger.error(
             "ffmpeg failed in convert_to_wav_16k_file: returncode=%s, input=%s, "
             "output=%s, stderr=%s",
             result.returncode,
             input_path,
             output_path,
-            error_text[:500],  # ограничим объём для логов
+            error_text[:500],
         )
         raise RuntimeError(
-            f"Ошибка при вызове ffmpeg (код {result.returncode}):\n" f"{result.stderr}"
+            f"Ошибка при вызове ffmpeg (код {result.returncode}):\n{error_text}"
         )
 
     logger.debug(
@@ -117,22 +146,31 @@ def convert_audio_bytes(input_bytes: bytes) -> bytes:
         "pipe:1",
     ]
 
-    process = subprocess.Popen(
-        cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except FileNotFoundError as e:
+        logger.error(
+            "Не удалось запустить ffmpeg в convert_audio_bytes. "
+            "Похоже, ffmpeg не установлен или не добавлен в PATH.",
+        )
+        raise RuntimeError(
+            "Не удалось запустить ffmpeg: исполняемый файл не найден. "
+            "Установи ffmpeg и добавь его в PATH."
+        ) from e
 
     wav_bytes, stderr = process.communicate(input_bytes)
 
-    # ffmpeg вернул ошибку?
     if process.returncode != 0:
-        error_text = stderr.decode("utf-8", errors="ignore")
+        error_text = stderr.decode("utf-8", errors="ignore") if stderr else ""
         logger.error(
             "ffmpeg failed in convert_audio_bytes: returncode=%s, stderr=%s",
             process.returncode,
-            error_text[:500],  # обрежем, чтобы лог не раздувался
+            error_text[:500],
         )
         raise RuntimeError(f"Ошибка ffmpeg (код {process.returncode}):\n{error_text}")
 
