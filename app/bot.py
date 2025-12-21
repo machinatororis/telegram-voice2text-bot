@@ -2,6 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
@@ -20,6 +21,7 @@ async def transcribe_bytes(
     *,
     mime_type: str | None = None,
     filename: str | None = None,
+    ffmpeg_path: str | Path | None = None,
 ) -> str:
     """
     Принимает «сырые» байты аудио (ogg/opus из Телеграм),
@@ -38,7 +40,7 @@ async def transcribe_bytes(
 
     # 1. OGG/MP3/MP4 → WAV 16k mono (in-memory)
     try:
-        wav_bytes = convert_audio_bytes(data)
+        wav_bytes = convert_audio_bytes(data, ffmpeg_path=ffmpeg_path)
     except Exception as e:
         logger.exception("Error converting audio using ffmpeg")
         return f"Не удалось подготовить аудио для распознавания: {e}"
@@ -81,7 +83,7 @@ async def main():
     logger.info("Starting bot. debug=%s", settings.debug)
 
     # 2a. Проверяем наличие ffmpeg
-    ffmpeg_ok = check_ffmpeg_available()
+    ffmpeg_ok = check_ffmpeg_available(settings.ffmpeg_path)
     if not ffmpeg_ok:
         # Дополнительное пояснение в логах (WARNING уже есть внутри функции)
         logger.warning(
@@ -161,6 +163,7 @@ async def main():
                 audio_bytes,
                 mime_type=mime_type,
                 filename=filename,
+                ffmpeg_path=settings.ffmpeg_path,
             )
 
             # 3. Отвечаем пользователю

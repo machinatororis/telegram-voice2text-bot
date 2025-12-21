@@ -16,6 +16,9 @@ class Settings:
     bot_token: str  # токен бота
     debug: bool  # режим DEBUG (подробные логи)
     log_dir: Path  # папка для логов
+    ffmpeg_path: (
+        Path | None
+    )  # Path("/usr/local/bin/ffmpeg"), если переменная задана, None, если не задана
     log_level: str = "INFO"  # уровень логирования (строкой)
 
 
@@ -59,6 +62,11 @@ def get_settings() -> Settings:
     # Если LOG_LEVEL не задан, то:
     #   - при DEBUG=True → "DEBUG"
     #   - иначе → "INFO"
+    ffmpeg_path_env = os.getenv("FFMPEG_PATH")
+    ffmpeg_path = (
+        Path(ffmpeg_path_env).expanduser().resolve() if ffmpeg_path_env else None
+    )
+
     log_level_env = os.getenv("LOG_LEVEL")
     if log_level_env:
         log_level = log_level_env.strip().upper()
@@ -69,5 +77,6 @@ def get_settings() -> Settings:
         bot_token=token,
         debug=debug,
         log_dir=log_dir,
+        ffmpeg_path=ffmpeg_path,
         log_level=log_level,
     )
