@@ -9,28 +9,71 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def check_ffmpeg_available() -> bool:
+def get_ffmpeg_executable(ffmpeg_path: str | Path | None = None) -> str:
     """
-    Проверяет, доступен ли ffmpeg в PATH.
-    Логирует предупреждение, если ffmpeg не найден.
-    Возвращает True, если ffmpeg найден, иначе False.
-    """
-    ffmpeg_path = shutil.which("ffmpeg")
+    Returns the ffmpeg executable to use.
 
-    if ffmpeg_path is None:
+    Priority:
+    1) ffmpeg_path (manual configuration via Settings/FFMPEG_PATH)
+    2) system PATH via shutil.which("ffmpeg")
+    3) fallback to literal "ffmpeg" (lets subprocess try PATH itself)
+    """
+    if ffmpeg_path:
+        p = Path(ffmpeg_path).expanduser()
+        try:
+            p = p.resolve()
+        except Exception:
+            pass
+
+        if p.is_file():
+            return str(p)
+
+        hint = ""
+        if Path().anchor and not str(p).lower().endswith(".exe"):
+            hint = " (On Windows, make sure the path points to ffmpeg.exe)"
+
+        logger.warning(
+            "FFMPEG_PATH is set but invalid (not a file): %s. Falling back to PATH.%s",
+            p,
+            hint,
+        )
+
+        logger.warning(
+            "FFMPEG_PATH is set but invalid (not a file): %s. Falling back to PATH.",
+            p,
+        )
+
+    detected = shutil.which("ffmpeg")
+    if detected:
+        return detected
+
+    return "ffmpeg"
+
+
+def check_ffmpeg_available(ffmpeg_path: str | Path | None = None) -> bool:
+    """
+    Checks whether ffmpeg is available either via manual path or system PATH.
+    """
+    ffmpeg_exe = get_ffmpeg_executable(ffmpeg_path)
+
+    # If we fell back to "ffmpeg" and PATH doesn't actually have it,
+    # we should still return False.
+    if ffmpeg_exe == "ffmpeg" and shutil.which("ffmpeg") is None:
         logger.warning(
             "ffmpeg not found in PATH. Audio conversion will not work until "
-            "ffmpeg is installed and added to the system PATH."
+            "ffmpeg is installed and added to the system PATH (or FFMPEG_PATH is set)."
         )
         return False
 
-    logger.debug("ffmpeg detected at: %s", ffmpeg_path)
+    logger.debug("ffmpeg will be used as: %s", ffmpeg_exe)
     return True
 
 
 def convert_to_wav_16k_file(
     input_path: str | Path,
     output_path: str | Path,
+    *,
+    ffmpeg_path: str | Path | None = None,
 ) -> None:
     """
     Конвертация файла на диске в WAV 16 kHz mono (PCM 16-bit) через ffmpeg.
@@ -52,8 +95,10 @@ def convert_to_wav_16k_file(
     if not input_path.is_file():
         raise FileNotFoundError(f"Входной файл не найден: {input_path}")
 
+    ffmpeg_exe = get_ffmpeg_executable(ffmpeg_path)
+
     cmd = [
-        "ffmpeg",
+        ffmpeg_exe,
         "-y",
         "-i",
         str(input_path),
@@ -104,7 +149,9 @@ def convert_to_wav_16k_file(
     )
 
 
-def convert_audio_bytes(input_bytes: bytes) -> bytes:
+def convert_audio_bytes(
+    input_bytes: bytes, *, ffmpeg_path: str | Path | None = None
+) -> bytes:
     """
     Принимает байты аудио (например, OGG/OPUS из Телеграма)
     и возвращает байты WAV 16 kHz mono (PCM 16-bit).
@@ -121,6 +168,8 @@ def convert_audio_bytes(input_bytes: bytes) -> bytes:
         len(input_bytes),
     )
 
+    ffmpeg_exe = get_ffmpeg_executable(ffmpeg_path)
+
     # Команда ffmpeg:
     # -i pipe:0            читать вход из stdin
     # -ac 1                моно
@@ -129,7 +178,7 @@ def convert_audio_bytes(input_bytes: bytes) -> bytes:
     # -f wav               формат WAV
     # pipe:1               вывод в stdout
     cmd = [
-        "ffmpeg",
+        ffmpeg_exe,
         "-hide_banner",
         "-loglevel",
         "error",
