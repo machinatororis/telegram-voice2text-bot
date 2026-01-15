@@ -29,9 +29,9 @@ def get_user_language(user_id: int | None) -> LangCode:
 MESSAGES: dict[str, dict[LangCode, str]] = {
     # Basic messages
     "start_greeting": {
-        "en": "Hi! I'm BubbleVoice 🎧\nSend me a voice message — I'll try to transcribe it.",
-        "ru": "Hi! I'm BubbleVoice 🎧\nSend me a voice message — I'll try to transcribe it.",
-        "uk": "Hi! I'm BubbleVoice 🎧\nSend me a voice message — I'll try to transcribe it.",
+        "en": "Hi! I'm bot BubbleVoice 🎧\nSend me a voice message and I'll try to transcribe it.",
+        "ru": "Привет! Я бот BubbleVoice🎧\nОтправь мне голосовое и я попробую его обработать.",
+        "uk": "Привіт! Я бот BubbleVoice 🎧\nНадішли мені голосове і я спробую його розпізнати.",
     },
     "choose_language": {
         "en": "Please choose your language:",

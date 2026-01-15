@@ -16,15 +16,20 @@ def create_dispatcher(*, ffmpeg_path: str | Path | None = None) -> Dispatcher:
 
     @dp.message(CommandStart())
     async def cmd_start(message: Message):
-        logger.info(
-            "User %s (%s) sent /start",
-            message.from_user.id,
-            message.from_user.full_name,
-        )
-        await message.answer(
-            "Привет! Я бот BubbleVoice 🎧\n"
-            "Отправь мне голосовое — я попробую его обработать."
-        )
+        user = message.from_user
+
+        if user:
+            logger.info(
+                "User %s (%s) sent /start",
+                user.id,
+                user.full_name,
+            )
+            user_id = user.id
+        else:
+            logger.info("Received /start from unknown user")
+            user_id = None
+
+        await message.answer(t(user_id, "start_greeting"))
 
     @dp.message(F.text)
     async def echo(message: Message):
