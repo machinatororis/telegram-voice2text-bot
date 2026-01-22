@@ -35,13 +35,13 @@ MESSAGES: dict[str, dict[LangCode, str]] = {
     },
     "choose_language": {
         "en": "Please choose your language:",
-        "ru": "Please choose your language:",
-        "uk": "Please choose your language:",
+        "ru": "Пожалуйста, выберите язык:",
+        "uk": "Будь ласка, оберіть мову:",
     },
     "language_set": {
-        "en": "✅ Language updated.",
-        "ru": "✅ Language updated.",
-        "uk": "✅ Language updated.",
+        "en": "✅ Language set to English.",
+        "ru": "✅ Язык переключён на русский.",
+        "uk": "✅ Мову змінено на українську.",
     },
     "echo_reply": {
         "en": "You wrote: {text}",
