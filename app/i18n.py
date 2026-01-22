@@ -54,6 +54,31 @@ MESSAGES: dict[str, dict[LangCode, str]] = {
         "ru": "Oops, something went wrong 😔 Please try again later.",
         "uk": "Oops, something went wrong 😔 Please try again later.",
     },
+    "empty_audio": {
+        "en": "I received an empty audio file 🤔",
+        "ru": "Я получила пустое аудио 🤔",
+        "uk": "Я отримала порожнє аудіо 🤔",
+    },
+    "ffmpeg_convert_error": {
+        "en": "Failed to prepare audio for transcription: {error}",
+        "ru": "Не удалось подготовить аудио для распознавания: {error}",
+        "uk": "Не вдалося підготувати аудіо для розпізнавання: {error}",
+    },
+    "whisper_transcription_error": {
+        "en": "Audio was converted to WAV, but an error occurred during transcription 😔",
+        "ru": "Аудио удалось сконвертировать в WAV, но при распознавании произошла ошибка 😔",
+        "uk": "Аудіо вдалося сконвертувати у WAV, але під час розпізнавання сталася помилка 😔",
+    },
+    "no_text_recognized": {
+        "en": "I couldn’t recognize any text in this audio 😔",
+        "ru": "Я не смогла распознать текст в этом аудио 😔",
+        "uk": "Я не змогла розпізнати текст у цьому аудіо 😔",
+    },
+    "voice_received": {
+        "en": "Voice message received 🎧\nFile: `{filename}`\n\n{text}",
+        "ru": "Голосовое получено 🎧\nФайл: `{filename}`\n\n{text}",
+        "uk": "Голосове отримано 🎧\nФайл: `{filename}`\n\n{text}",
+    },
 }
 
 
