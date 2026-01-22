@@ -1,12 +1,15 @@
 # BubbleVoice 🎧
 
 Telegram bot that converts voice messages into text using local Whisper and ffmpeg.
+Supports a multilingual interface (EN / RU / UK).
 
 ---
 
 ## Features
 
 - 🎙️ Voice message transcription
+- 🌍 Multilingual interface (English / Русский / Українська)
+- 🗣️ Language selection via /start and /language commands
 - 🧠 Local Whisper model (no external APIs)
 - 🔊 Audio conversion via ffmpeg (OGG/MP3/MP4 → WAV 16 kHz)
 - ⚙️ Configurable via environment variables
@@ -27,7 +30,7 @@ Telegram bot that converts voice messages into text using local Whisper and ffmp
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/telegram-voice2text-bot.git
+git clone https://github.com/machinatororis/telegram-voice2text-bot.git
 cd telegram-voice2text-bot
 ```
 
@@ -83,10 +86,12 @@ If ```FFMPEG_PATH``` is set but invalid, the app will fall back to searching ```
 
 ## Run the bot
 ```
-python -m app.bot
+python main.py
 ```
+The `main.py` file is the application entry point and initializes
+logging, configuration, and bot handlers.
 
-Notes
+## Notes
 
 * ```.env``` is intentionally excluded from git.
 
