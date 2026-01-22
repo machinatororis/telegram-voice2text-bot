@@ -8,6 +8,7 @@ from aiogram.types import Message
 
 from app.utils.audio import convert_audio_bytes
 from app.utils.transcribe import transcribe_wav_bytes
+from app.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,10 @@ async def transcribe_bytes(
     mime_type: str | None = None,
     filename: str | None = None,
     ffmpeg_path: str | Path | None = None,
+    user_id: int | None = None,
 ) -> str:
     if not data:
-        return "Я получила пустое аудио 🤔"
+        return t(user_id, "empty_audio")
 
     logger.info(
         "Starting audio processing: filename=%s, mime_type=%s, size=%d bytes",
@@ -33,7 +35,7 @@ async def transcribe_bytes(
         wav_bytes = convert_audio_bytes(data, ffmpeg_path=ffmpeg_path)
     except Exception as e:
         logger.exception("Error converting audio using ffmpeg")
-        return f"Не удалось подготовить аудио для распознавания: {e}"
+        return t(user_id, "ffmpeg_convert_error", error=e)
 
     logger.info(
         "Audio converted to WAV: filename=%s, wav_size=%d bytes",
@@ -45,10 +47,7 @@ async def transcribe_bytes(
         text = transcribe_wav_bytes(wav_bytes)
     except Exception:
         logger.exception("Error during Whisper transcription")
-        return (
-            "Аудио удалось сконвертировать в WAV, "
-            "но при распознавании произошла ошибка 😔"
-        )
+        return t(user_id, "whisper_transcription_error")
 
     logger.info(
         "Transcription completed: filename=%s, text_len=%d",
@@ -57,7 +56,7 @@ async def transcribe_bytes(
     )
 
     if not text.strip():
-        return "Я не смогла распознать текст в этом аудио 😔"
+        return t(user_id, "no_text_recognized")
 
     return text
 
@@ -70,6 +69,7 @@ def register_voice_handlers(
     @dp.message(F.voice | F.audio | F.video_note)
     async def on_voice(message: Message):
         user = message.from_user
+        user_id = user.id if user else None
         kind = "voice" if message.voice else "audio" if message.audio else "video_note"
 
         logger.info(
@@ -115,6 +115,7 @@ def register_voice_handlers(
                 mime_type=mime_type,
                 filename=filename,
                 ffmpeg_path=ffmpeg_path,
+                user_id=user_id,
             )
 
             logger.info(
@@ -125,7 +126,7 @@ def register_voice_handlers(
             )
 
             await message.reply(
-                "Голосовое получено 🎧\n" f"Файл: `{filename}`\n\n" f"{text}",
+                t(user_id, "voice_received", filename=filename, text=text),
                 parse_mode="Markdown",
             )
         except Exception:
@@ -135,6 +136,4 @@ def register_voice_handlers(
                 message.chat.id,
                 message.message_id,
             )
-            await message.reply(
-                "Упс, что-то пошло не так при распознавании 😔 Попробуй ещё раз позже."
-            )
+            await message.reply(t(user_id, "error_general"))
