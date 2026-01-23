@@ -2,6 +2,12 @@
   <img src="docs/images/logo.jpg" alt="BubbleVoice bot avatar" width="200"/>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10+-blue"/>
+  <img src="https://img.shields.io/badge/telegram-bot-2CA5E0"/>
+  <img src="https://img.shields.io/badge/whisper-local-orange"/>
+</p>
+
 # BubbleVoice 🎧
 
 Telegram bot that converts voice messages into text using local Whisper and ffmpeg.
