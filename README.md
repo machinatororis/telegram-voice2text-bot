@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/logo.jpg" alt="BubbleVoice bot avatar" width="200"/>
+</p>
+
 # BubbleVoice 🎧
 
 Telegram bot that converts voice messages into text using local Whisper and ffmpeg.
@@ -24,6 +28,13 @@ Supports a multilingual interface (EN / RU / UK).
 - Telegram Bot Token
 
 ---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/language-selection.jpg" alt="Language selection" width="250"/>
+  <img src="docs/screenshots/voice-transcription.jpg" alt="Voice transcription example" width="250"/>
+</p>
 
 ## Setup
 
