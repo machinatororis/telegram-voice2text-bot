@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from enum import Enum
 
 from dotenv import load_dotenv
 
@@ -11,9 +12,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+class TranscriberBackend(str, Enum):
+    WHISPER = "whisper"
+    DEEPGRAM = "deepgram"
+
+
 @dataclass
 class Settings:
     bot_token: str  # токен бота
+    transcriber_backend: TranscriberBackend  # backend-переключатель
     debug: bool  # режим DEBUG (подробные логи)
     log_dir: Path  # папка для логов
     ffmpeg_path: (
@@ -49,6 +56,12 @@ def get_settings() -> Settings:
             "BOT_TOKEN=твой_токен_от_@BotFather"
         )
 
+    backend_raw = os.getenv("TRANSCRIBER_BACKEND", "whisper").lower()
+    try:
+        transcriber_backend = TranscriberBackend(backend_raw)
+    except ValueError:
+        transcriber_backend = TranscriberBackend.WHISPER
+
     # 2. Необязательный DEBUG (по умолчанию False)
     debug_env = os.getenv("DEBUG")  # может быть None
     debug = _str_to_bool(debug_env, default=False)
@@ -75,6 +88,7 @@ def get_settings() -> Settings:
 
     return Settings(
         bot_token=token,
+        transcriber_backend=transcriber_backend,
         debug=debug,
         log_dir=log_dir,
         ffmpeg_path=ffmpeg_path,
