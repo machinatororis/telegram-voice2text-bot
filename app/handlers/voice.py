@@ -7,10 +7,13 @@ from aiogram import Dispatcher, F
 from aiogram.types import Message
 
 from app.utils.audio import convert_audio_bytes
-from app.utils.transcribe import transcribe_wav_bytes
+from app.transcription import transcribe
+from app.config import get_settings
 from app.i18n import t
 
 logger = logging.getLogger(__name__)
+
+settings = get_settings()
 
 
 async def transcribe_bytes(
@@ -44,7 +47,11 @@ async def transcribe_bytes(
     )
 
     try:
-        text = transcribe_wav_bytes(wav_bytes)
+        text = await transcribe(
+            wav_bytes,
+            settings=settings,
+            user_id=user_id,
+        )
     except Exception:
         logger.exception("Error during Whisper transcription")
         return t(user_id, "whisper_transcription_error")
