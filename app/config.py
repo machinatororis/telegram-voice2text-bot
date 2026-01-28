@@ -28,6 +28,9 @@ class Settings:
     )  # Path("/usr/local/bin/ffmpeg"), если переменная задана, None, если не задана
     log_level: str = "INFO"  # уровень логирования (строкой)
 
+    # Deepgram
+    dg_api_key: str | None = None  # ключ для Deepgram, может быть не задан
+
 
 def _str_to_bool(value: str | None, *, default: bool = False) -> bool:
     """
@@ -86,6 +89,16 @@ def get_settings() -> Settings:
     else:
         log_level = "DEBUG" if debug else "INFO"
 
+    # 5. Deepgram API key (опционально)
+    dg_api_key = os.getenv("DG_API_KEY")
+    # Если явно выбран Deepgram, но ключа нет — это явная ошибка конфигурации
+    if transcriber_backend == TranscriberBackend.DEEPGRAM and not dg_api_key:
+        raise RuntimeError(
+            "TRANSCRIBER_BACKEND=deepgram, но DG_API_KEY не задан.\n"
+            "Добавь в .env строку:\n"
+            "DG_API_KEY=твоя_строка_ключа_Deepgram"
+        )
+
     return Settings(
         bot_token=token,
         transcriber_backend=transcriber_backend,
@@ -93,4 +106,5 @@ def get_settings() -> Settings:
         log_dir=log_dir,
         ffmpeg_path=ffmpeg_path,
         log_level=log_level,
+        dg_api_key=dg_api_key,
     )
