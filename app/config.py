@@ -31,6 +31,9 @@ class Settings:
     # Deepgram
     dg_api_key: str | None = None  # ключ для Deepgram, может быть не задан
 
+    # Webhook (optional secret path)
+    webhook_secret: str | None = None
+
 
 def _str_to_bool(value: str | None, *, default: bool = False) -> bool:
     """
@@ -99,6 +102,9 @@ def get_settings() -> Settings:
             "DG_API_KEY=твоя_строка_ключа_Deepgram"
         )
 
+    # 6. Optional webhook secret
+    webhook_secret = os.getenv("WEBHOOK_SECRET")
+
     return Settings(
         bot_token=token,
         transcriber_backend=transcriber_backend,
@@ -107,4 +113,5 @@ def get_settings() -> Settings:
         ffmpeg_path=ffmpeg_path,
         log_level=log_level,
         dg_api_key=dg_api_key,
+        webhook_secret=webhook_secret,
     )

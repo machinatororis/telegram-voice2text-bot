@@ -27,6 +27,19 @@ if not check_ffmpeg_available(settings.ffmpeg_path):
         "Voice message conversion may not work in webhook mode."
     )
 
+# --- Webhook path configuration ---
+
+if getattr(settings, "webhook_secret", None):
+    WEBHOOK_PATH = f"/webhook/{settings.webhook_secret}"
+    logger.info("Using secret webhook path: %s", WEBHOOK_PATH)
+else:
+    WEBHOOK_PATH = "/webhook"
+    logger.warning(
+        "WEBHOOK_SECRET is not set. Using public webhook path %s. "
+        "For production deployments, it is recommended to set WEBHOOK_SECRET.",
+        WEBHOOK_PATH,
+    )
+
 # --- Инициализация бота и диспетчера ---
 
 bot = Bot(token=settings.bot_token)
@@ -58,7 +71,7 @@ async def health():
     return {"status": "ok"}
 
 
-@app.post("/webhook")
+@app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
     """
     Endpoint, куда Telegram будет присылать апдейты.
