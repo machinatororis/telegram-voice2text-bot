@@ -1,3 +1,10 @@
+"""
+Entry point for local development: run bot using long polling.
+
+Usage:
+    python main.py
+"""
+
 import asyncio
 import logging
 
