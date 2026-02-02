@@ -135,12 +135,54 @@ FFMPEG_PATH=C:\ffmpeg\bin\ffmpeg.exe
 ```
 If ```FFMPEG_PATH``` is set but invalid, the app will fall back to searching ```ffmpeg``` in ```PATH```.
 
-## Run the bot
+## Run the bot (Local development — polling)
 ```
 python main.py
 ```
 The `main.py` file is the application entry point and initializes
 logging, configuration, and bot handlers.
+
+This mode uses Telegram long polling and is intended for local development and debugging.
+
+## Run in cloud (Webhook mode with FastAPI)
+
+For cloud deployments, BubbleVoice can run in **webhook mode** using FastAPI.
+In this mode, Telegram sends updates to the bot via HTTP POST requests instead of long polling.
+
+### Start the webhook server
+
+Run the FastAPI application using `uvicorn`:
+
+```bash
+uvicorn webapp:app --host 0.0.0.0 --port 8000
+```
+
+The server exposes the following endpoints:
+
+- `POST /webhook` — receives Telegram updates sent by the Telegram API
+- `GET /health` — health check endpoint for cloud platforms
+
+This mode is recommended for:
+- cloud deployments
+- containerized environments (Docker, PaaS)
+- platforms with limited CPU resources where long polling is inefficient
+
+### Webhook security
+
+For additional security, it is recommended to use a **secret webhook path**.
+This helps prevent random HTTP requests from reaching the webhook endpoint.
+
+Example:
+
+```env
+WEBHOOK_SECRET=my-super-secret-token
+```
+
+Webhook URL example:
+```
+https://your-domain.com/webhook/my-super-secret-token
+```
+In this case, Telegram will only send updates to the correct secret URL.
 
 ## Notes
 
