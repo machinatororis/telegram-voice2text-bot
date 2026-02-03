@@ -1,13 +1,33 @@
 import logging
 
 from app.config import Settings, TranscriberBackend
-from app.transcription.whisper_backend import transcribe_wav_bytes
 from app.transcription.deepgram_backend import (
     transcribe as deepgram_transcribe,
     DeepgramError,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _transcribe_with_whisper(wav_bytes: bytes) -> str:
+    """
+    Ленивая обёртка над Whisper-бэкендом.
+
+    Импортирует whisper_backend только при первом вызове.
+    Это позволяет запускать приложение в окружениях без Whisper
+    (например, Docker-образ для JustRunMy.App), пока этот бэкенд
+    реально не используется.
+    """
+    try:
+        from app.transcription.whisper_backend import transcribe_wav_bytes
+    except ImportError as exc:
+        logger.error(
+            "Whisper backend was requested but is not available in this environment. "
+            "Install Whisper packages or switch TRANSCRIBER_BACKEND to 'deepgram'."
+        )
+        raise RuntimeError("Whisper backend is not available") from exc
+
+    return transcribe_wav_bytes(wav_bytes)
 
 
 async def transcribe(
@@ -23,20 +43,27 @@ async def transcribe(
     выбирает Whisper или Deepgram.
     """
 
+    # --- Явный выбор Whisper ---
     if settings.transcriber_backend == TranscriberBackend.WHISPER:
         logger.debug("Using Whisper backend for transcription: user_id=%s", user_id)
-        return transcribe_wav_bytes(wav_bytes)
+        return _transcribe_with_whisper(wav_bytes)
 
+    # --- Deepgram как облачный бэкенд ---
     if settings.transcriber_backend == TranscriberBackend.DEEPGRAM:
-        # safety: если по каким-то причинам ключа нет в settings,
-        # не валимся, а откатываемся на Whisper
         if not getattr(settings, "dg_api_key", None):
             logger.error(
                 "Deepgram backend is configured but dg_api_key is missing. "
-                "Falling back to Whisper. user_id=%s",
+                "user_id=%s",
                 user_id,
             )
-            return transcribe_wav_bytes(wav_bytes)
+            # Пытаемся откатиться на Whisper, если он вообще установлен.
+            try:
+                return _transcribe_with_whisper(wav_bytes)
+            except RuntimeError:
+                logger.error(
+                    "Whisper fallback is not available. Returning empty transcription."
+                )
+                return ""
 
         try:
             logger.debug(
@@ -48,22 +75,38 @@ async def transcribe(
             )
         except DeepgramError:
             logger.exception(
-                "Deepgram transcription failed, falling back to Whisper. user_id=%s",
-                user_id,
-            )
-            return transcribe_wav_bytes(wav_bytes)
-        except Exception:
-            logger.exception(
-                "Unexpected error in Deepgram backend, falling back to Whisper. "
+                "Deepgram transcription failed, attempting Whisper fallback. "
                 "user_id=%s",
                 user_id,
             )
-            return transcribe_wav_bytes(wav_bytes)
+            try:
+                return _transcribe_with_whisper(wav_bytes)
+            except RuntimeError:
+                logger.error(
+                    "Whisper fallback is not available. Returning empty transcription."
+                )
+                return ""
+        except Exception:
+            logger.exception(
+                "Unexpected error in Deepgram backend. user_id=%s", user_id
+            )
+            try:
+                return _transcribe_with_whisper(wav_bytes)
+            except RuntimeError:
+                logger.error(
+                    "Whisper fallback is not available. Returning empty transcription."
+                )
+                return ""
 
-    # на всякий случай: если пришло что-то странное в settings.transcriber_backend
+    # --- Непонятный backend в настройках ---
     logger.warning(
-        "Unknown transcriber backend %r. Falling back to Whisper. user_id=%s",
+        "Unknown transcriber backend %r. Falling back to Whisper if available. "
+        "user_id=%s",
         settings.transcriber_backend,
         user_id,
     )
-    return transcribe_wav_bytes(wav_bytes)
+    try:
+        return _transcribe_with_whisper(wav_bytes)
+    except RuntimeError:
+        logger.error("Whisper backend is not available. Returning empty transcription.")
+        return ""
