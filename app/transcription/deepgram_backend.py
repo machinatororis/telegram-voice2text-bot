@@ -9,11 +9,11 @@ import httpx
 logger = logging.getLogger(__name__)
 
 DEEPGRAM_API_URL = "https://api.deepgram.com/v1/listen"
-DEFAULT_MODEL = "nova-3-general"  # хороший дефолт для общего кейса
+DEFAULT_MODEL = "nova-3-general"  # General-purpose transcription model
 
 
 class DeepgramError(Exception):
-    """Базовое исключение для ошибок Deepgram."""
+    """Base exception for Deepgram transcription errors."""
 
 
 async def transcribe(
@@ -23,14 +23,10 @@ async def transcribe(
     timeout_s: float = 30.0,
 ) -> str:
     """
-    Отправляет WAV-байты в Deepgram и возвращает текст.
+    Send WAV audio to Deepgram and return the transcript.
 
-    Ожидается, что аудио уже в формате:
-    - WAV
-    - 16 kHz
-    - mono
-
-    Этим занимается convert_audio_bytes.
+    Input must already be 16 kHz mono WAV audio, as produced by
+    convert_audio_bytes.
     """
     if not wav_bytes:
         logger.warning("Deepgram: empty wav_bytes")
@@ -41,7 +37,7 @@ async def transcribe(
         "Content-Type": "audio/wav",
     }
 
-    # detect_language=true — пусть сам понимает, что там за язык
+    # Let Deepgram detect the spoken language automatically.
     params = {
         "model": DEFAULT_MODEL,
         "smart_format": "true",
@@ -75,9 +71,8 @@ async def transcribe(
         logger.error("Failed to parse Deepgram JSON response: %s", exc)
         raise DeepgramError("Deepgram returned invalid JSON") from exc
 
-    # Разбор структуры вида:
-    # data["results"]["channels"][0]["alternatives"][0]["transcript"]
-    # https://developers.deepgram.com/docs/pre-recorded-audio :contentReference[oaicite:0]{index=0}
+    # Extract the transcript from the first channel's best alternative.
+    # Deepgram response: results.channels[0].alternatives[0].transcript
     try:
         channels = data["results"]["channels"]
         if not channels:
