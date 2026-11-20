@@ -89,19 +89,19 @@ def create_dispatcher(*, ffmpeg_path: str | Path | None = None) -> Dispatcher:
         if user_id is not None:
             set_user_language(user_id, lang)
 
-        # закрываем "часики" на кнопке
+        # Acknowledge the callback to stop the button's loading indicator.
         await callback.answer()
 
-        # убираем клавиатуру под исходным сообщением
+        # Remove the language-selection keyboard from the original message.
         if callback.message:
             await callback.message.edit_reply_markup(reply_markup=None)
 
-            # сообщение "язык изменён"
+            # Confirm the selected language.
             await callback.message.answer(t(user_id, "language_set"))
-            # приветствие на выбранном языке
+            # Greet the user in the selected language.
             await callback.message.answer(t(user_id, "start_greeting"))
 
-    # подключаем модуль с voice-логикой
+    # Register the voice-message handlers.
     register_voice_handlers(dp, ffmpeg_path=ffmpeg_path)
 
     return dp

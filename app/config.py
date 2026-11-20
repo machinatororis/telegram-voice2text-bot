@@ -8,7 +8,7 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
-# Загружаем переменные окружения из .env один раз здесь
+# Load environment variables from .env.
 load_dotenv()
 
 
@@ -19,17 +19,17 @@ class TranscriberBackend(str, Enum):
 
 @dataclass
 class Settings:
-    bot_token: str  # токен бота
-    transcriber_backend: TranscriberBackend  # backend-переключатель
-    debug: bool  # режим DEBUG (подробные логи)
-    log_dir: Path  # папка для логов
+    bot_token: str  # Telegram bot token
+    transcriber_backend: TranscriberBackend  # Selected transcription backend
+    debug: bool  # Enable debug mode
+    log_dir: Path  # Directory for log files
     ffmpeg_path: (
         Path | None
-    )  # Path("/usr/local/bin/ffmpeg"), если переменная задана, None, если не задана
-    log_level: str = "INFO"  # уровень логирования (строкой)
+    )  # Custom ffmpeg path, or None to use the system PATH
+    log_level: str = "INFO"  # Logging level name
 
     # Deepgram
-    dg_api_key: str | None = None  # ключ для Deepgram, может быть не задан
+    dg_api_key: str | None = None  # Optional Deepgram API key
 
     # Webhook (optional secret path)
     webhook_secret: str | None = None
@@ -37,9 +37,10 @@ class Settings:
 
 def _str_to_bool(value: str | None, *, default: bool = False) -> bool:
     """
-    Аккуратно превращает строку из переменной окружения в bool.
-    Поддерживаем: 1/0, true/false, yes/no, on/off.
-    Если значение непонятно — возвращаем default.
+    Parse a boolean environment variable.
+
+    Accept 1/0, true/false, yes/no, and on/off (case-insensitive).
+    Return default for missing or unrecognized values.
     """
     if value is None:
         return default
@@ -54,7 +55,7 @@ def _str_to_bool(value: str | None, *, default: bool = False) -> bool:
 
 
 def get_settings() -> Settings:
-    # 1. Обязательный токен
+    # Read the required Telegram bot token.
     token = os.getenv("BOT_TOKEN", "")
     if not token:
         raise RuntimeError(
@@ -68,19 +69,17 @@ def get_settings() -> Settings:
     except ValueError:
         transcriber_backend = TranscriberBackend.WHISPER
 
-    # 2. Необязательный DEBUG (по умолчанию False)
-    debug_env = os.getenv("DEBUG")  # может быть None
+    # Read optional debug mode (disabled by default).
+    debug_env = os.getenv("DEBUG")  # May be absent
     debug = _str_to_bool(debug_env, default=False)
 
-    # 3. Необязательная папка для логов (по умолчанию ./logs)
+    # Use ./logs unless LOG_DIR is configured.
     log_dir_env = os.getenv("LOG_DIR", "logs")
     log_dir = Path(log_dir_env).resolve()
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    # 4. Уровень логирования LOG_LEVEL
-    # Если LOG_LEVEL не задан, то:
-    #   - при DEBUG=True → "DEBUG"
-    #   - иначе → "INFO"
+    # Use LOG_LEVEL when set; otherwise default to DEBUG in debug mode
+    # and INFO in normal mode.
     ffmpeg_path_env = os.getenv("FFMPEG_PATH")
     ffmpeg_path = (
         Path(ffmpeg_path_env).expanduser().resolve() if ffmpeg_path_env else None
@@ -92,9 +91,9 @@ def get_settings() -> Settings:
     else:
         log_level = "DEBUG" if debug else "INFO"
 
-    # 5. Deepgram API key (опционально)
+    # Read the optional Deepgram API key.
     dg_api_key = os.getenv("DG_API_KEY")
-    # Если явно выбран Deepgram, но ключа нет — это явная ошибка конфигурации
+    # Require an API key when the Deepgram backend is selected.
     if transcriber_backend == TranscriberBackend.DEEPGRAM and not dg_api_key:
         raise RuntimeError(
             "TRANSCRIBER_BACKEND=deepgram, но DG_API_KEY не задан.\n"
@@ -102,7 +101,7 @@ def get_settings() -> Settings:
             "DG_API_KEY=твоя_строка_ключа_Deepgram"
         )
 
-    # 6. Optional webhook secret
+    # Read the optional webhook path secret.
     webhook_secret = os.getenv("WEBHOOK_SECRET")
 
     return Settings(

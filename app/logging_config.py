@@ -10,9 +10,9 @@ from app.config import Settings
 
 def _get_log_level(level_name: str) -> int:
     """
-    Преобразует текстовый уровень ("DEBUG", "INFO" и т.п.)
-    в числовое значение logging.DEBUG и т.п.
-    Если что-то не то — по умолчанию INFO.
+    Resolve a logging level name (e.g., "DEBUG" or "INFO") to its numeric value.
+
+    Fall back to logging.INFO when the name is unrecognized.
     """
     level_name = (level_name or "").upper()
     level = getattr(logging, level_name, None)
@@ -23,11 +23,10 @@ def _get_log_level(level_name: str) -> int:
 
 def setup_logging(settings: Settings) -> Logger:
     """
-    Централизованная настройка логирования:
-    - создаёт папку для логов
-    - настраивает root-логгер
-    - добавляет хендлер в файл + в консоль
-    Возвращает логгер текущего модуля (по желанию).
+    Configure application-wide logging.
+
+    Create the log directory, configure the root logger, and add file and
+    console handlers. Return this module's logger.
     """
     log_dir = Path(settings.log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -35,29 +34,27 @@ def setup_logging(settings: Settings) -> Logger:
     log_file = log_dir / "bot.log"
     log_level = _get_log_level(settings.log_level)
 
-    # Общий формат для всех сообщений
+    # Use the same format for file and console messages.
     formatter = logging.Formatter(
         "%(asctime)s [%(levelname)s] [%(name)s] " "%(message)s"
     )
 
-    # Берём root-логгер и чистим старые хендлеры,
-    # чтобы не дублировались сообщения.
+    # Clear existing root handlers to avoid duplicate log messages.
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     root_logger.handlers.clear()
 
-    # Логи в файл
+    # Write logs to a file.
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)
 
-    # Логи в консоль
+    # Also write logs to the console.
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    # Можно вернуть логгер для модуля logging_config,
-    # но обычно нам важен сам факт настройки.
+    # Return this module's logger after initializing logging.
     logger = logging.getLogger(__name__)
     logger.debug(
         "Logging initialized. level=%s, log_file=%s",

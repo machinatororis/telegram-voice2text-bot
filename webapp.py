@@ -14,7 +14,7 @@ from app.utils.audio import check_ffmpeg_available
 
 logger = logging.getLogger(__name__)
 
-# --- Инициализация настроек и логирования ---
+# --- Settings and logging initialization ---
 
 settings = get_settings()
 setup_logging(settings)
@@ -40,14 +40,14 @@ else:
         WEBHOOK_PATH,
     )
 
-# --- Инициализация бота и диспетчера ---
+# --- Bot and dispatcher initialization ---
 
 bot = Bot(token=settings.bot_token)
 dp = create_dispatcher(ffmpeg_path=settings.ffmpeg_path)
 
 logger.info("Bot and dispatcher initialized for webhook mode.")
 
-# --- Инициализация FastAPI-приложения ---
+# --- FastAPI application initialization ---
 
 app = FastAPI()
 
@@ -55,7 +55,7 @@ app = FastAPI()
 @app.on_event("startup")
 async def on_startup():
     """
-    Хук запуска FastAPI: хорошее место для логов "приложение поднялось".
+    Log successful startup of the FastAPI application.
     """
     logger.info(
         "FastAPI application startup complete. Webhook is ready to receive updates."
@@ -73,18 +73,18 @@ async def health():
 @app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
     """
-    Endpoint, куда Telegram будет присылать апдейты.
+    Receive Telegram webhook updates and forward them to the dispatcher.
     """
     data = await request.json()
 
     # Log the incoming update without exposing message contents
     logger.debug("Received Telegram update")
 
-    # Превращаем JSON в объект Update из aiogram
+    # Parse the incoming JSON as an aiogram Update.
     update = Update.model_validate(data)
 
-    # Передаем апдейт в диспетчер — он уже разрулит handlers
+    # Dispatch the update to the registered aiogram handlers.
     await dp.feed_update(bot, update)
 
-    # Telegram ожидает любой 2xx, но JSON ok=true — классика
+    # A successful 2xx response acknowledges delivery to Telegram.
     return {"ok": True}

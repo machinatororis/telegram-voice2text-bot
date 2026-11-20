@@ -76,11 +76,10 @@ def convert_to_wav_16k_file(
     ffmpeg_path: str | Path | None = None,
 ) -> None:
     """
-    Конвертация файла на диске в WAV 16 kHz mono (PCM 16-bit) через ffmpeg.
-    Нужна нам:
-    - для отладки
-    - для скриптов/утилит
-    Бот может её вообще не использовать.
+    Convert an audio file to 16 kHz mono PCM 16-bit WAV using ffmpeg.
+
+    Intended for debugging and utility scripts; the bot can process
+    in-memory audio without calling this function.
     """
 
     input_path = Path(input_path)
@@ -116,7 +115,7 @@ def convert_to_wav_16k_file(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,  # stderr уже строка
+            text=True,  # Decode captured process output as text
         )
     except FileNotFoundError as e:
         logger.error(
@@ -153,11 +152,9 @@ def convert_audio_bytes(
     input_bytes: bytes, *, ffmpeg_path: str | Path | None = None
 ) -> bytes:
     """
-    Принимает байты аудио (например, OGG/OPUS из Телеграма)
-    и возвращает байты WAV 16 kHz mono (PCM 16-bit).
+    Convert audio bytes (e.g., Telegram OGG/Opus) to 16 kHz mono PCM WAV.
 
-    - Никаких временных файлов.
-    - Вся конвертация через stdin/stdout ffmpeg.
+    Pipe audio through ffmpeg stdin/stdout without temporary files.
     """
 
     if not input_bytes:
@@ -170,13 +167,8 @@ def convert_audio_bytes(
 
     ffmpeg_exe = get_ffmpeg_executable(ffmpeg_path)
 
-    # Команда ffmpeg:
-    # -i pipe:0            читать вход из stdin
-    # -ac 1                моно
-    # -ar 16000            16 kHz
-    # -c:a pcm_s16le       WAV PCM 16-bit
-    # -f wav               формат WAV
-    # pipe:1               вывод в stdout
+    # ffmpeg reads from stdin, converts to mono 16 kHz PCM 16-bit WAV,
+    # and writes the result to stdout.
     cmd = [
         ffmpeg_exe,
         "-hide_banner",
@@ -237,18 +229,18 @@ def convert_audio_bytes(
 
 
 if __name__ == "__main__":
-    # Небольшой ручной тест, чтобы проверить, что всё работает.
+    # Manual smoke test for file-based audio conversion.
     src = Path("data/audio/audio_2025-11-13_16-22-04.ogg")
     dst = src.with_name(src.stem + "_utils_16k.wav")
     print(f"Конвертирую {src} -> {dst}")
     convert_to_wav_16k_file(src, dst)
     print("Готово! Проверь файл в проводнике.")
 
-    # Ручной тест для проверки convert_audio_bytes
+    # Manual smoke test for in-memory audio conversion.
 
     from pathlib import Path
 
-    # подставь любое .ogg, которое у тебя есть в data/audio
+    # Replace with an existing .ogg file under data/audio.
     src = Path("data/audio/audio_2025-11-13_16-22-04.ogg")
     dst = src.with_name(src.stem + "_bytes_test.wav")
 

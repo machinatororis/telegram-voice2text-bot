@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Загружаем модель один раз
+# Load the Whisper model once at module import.
 logger.info("Loading Whisper model 'small'...")
 model = whisper.load_model("small")
 logger.info("Whisper model 'small' loaded successfully")
@@ -13,8 +13,7 @@ logger.info("Whisper model 'small' loaded successfully")
 
 def transcribe_wav_bytes(wav_bytes: bytes) -> str:
     """
-    Принимает WAV-байты, сохраняет во временный файл, передаёт Whisper'у,
-    потом удаляет файл.
+    Transcribe WAV bytes via a temporary file and remove it afterward.
     """
     if not wav_bytes:
         logger.warning("transcribe_wav_bytes called with empty wav_bytes")
@@ -23,11 +22,11 @@ def transcribe_wav_bytes(wav_bytes: bytes) -> str:
     tmp_path: str | None = None
 
     try:
-        # 1. создаём временный файл, НО не удаляем автоматически
+        # Create a temporary file that remains available until transcription ends.
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             tmp.write(wav_bytes)
             tmp.flush()
-            tmp_path = tmp.name  # запоминаем путь
+            tmp_path = tmp.name  # Keep the path for cleanup
 
         logger.debug(
             "Created temp wav file for transcription: path=%s size=%s",
@@ -35,7 +34,7 @@ def transcribe_wav_bytes(wav_bytes: bytes) -> str:
             len(wav_bytes),
         )
 
-        # 2. запускаем распознавание
+        # Run Whisper transcription.
         logger.debug("Starting Whisper transcription: temp_path=%s", tmp_path)
         try:
             result = model.transcribe(
@@ -45,7 +44,7 @@ def transcribe_wav_bytes(wav_bytes: bytes) -> str:
                 beam_size=5,
             )
         except Exception:
-            # Логируем с трейсбеком и пробрасываем дальше
+            # Log the traceback and re-raise the error.
             logger.exception(
                 "Error during Whisper transcription. temp_path=%s", tmp_path
             )
@@ -61,11 +60,11 @@ def transcribe_wav_bytes(wav_bytes: bytes) -> str:
         return text
 
     finally:
-        # 3. пробуем удалить временный файл
+        # Remove the temporary file, including when transcription fails.
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
                 logger.debug("Temp wav file removed: %s", tmp_path)
             except OSError:
-                # если не получилось удалить
+                # Report cleanup failures without masking transcription results.
                 logger.warning("Failed to remove temp wav file: %s", tmp_path)

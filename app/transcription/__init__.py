@@ -11,12 +11,10 @@ logger = logging.getLogger(__name__)
 
 def _transcribe_with_whisper(wav_bytes: bytes) -> str:
     """
-    Ленивая обёртка над Whisper-бэкендом.
+    Load the local Whisper backend only when transcription requires it.
 
-    Импортирует whisper_backend только при первом вызове.
-    Это позволяет запускать приложение в окружениях без Whisper
-    (например, Docker-образ для JustRunMy.App), пока этот бэкенд
-    реально не используется.
+    Deferred import lets the cloud Docker image run without Whisper
+    dependencies unless the Whisper backend is selected.
     """
     try:
         from app.transcription.whisper_backend import transcribe_wav_bytes
@@ -37,18 +35,18 @@ async def transcribe(
     user_id: int | None = None,
 ) -> str:
     """
-    Общая точка входа для транскрипции.
+    Transcribe WAV audio using the backend selected in settings.
 
-    В зависимости от settings.transcriber_backend
-    выбирает Whisper или Deepgram.
+    Dispatch to local Whisper or cloud Deepgram based on
+    settings.transcriber_backend.
     """
 
-    # --- Явный выбор Whisper ---
+    # --- Local Whisper backend ---
     if settings.transcriber_backend == TranscriberBackend.WHISPER:
         logger.debug("Using Whisper backend for transcription: user_id=%s", user_id)
         return _transcribe_with_whisper(wav_bytes)
 
-    # --- Deepgram как облачный бэкенд ---
+    # --- Cloud Deepgram backend ---
     if settings.transcriber_backend == TranscriberBackend.DEEPGRAM:
         if not getattr(settings, "dg_api_key", None):
             logger.error(
@@ -56,7 +54,7 @@ async def transcribe(
                 "user_id=%s",
                 user_id,
             )
-            # Пытаемся откатиться на Whisper, если он вообще установлен.
+            # Fall back to Whisper if its dependencies are installed.
             try:
                 return _transcribe_with_whisper(wav_bytes)
             except RuntimeError:
@@ -98,7 +96,7 @@ async def transcribe(
                 )
                 return ""
 
-    # --- Непонятный backend в настройках ---
+    # --- Unrecognized transcription backend ---
     logger.warning(
         "Unknown transcriber backend %r. Falling back to Whisper if available. "
         "user_id=%s",
