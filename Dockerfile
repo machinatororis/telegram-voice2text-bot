@@ -28,5 +28,5 @@ COPY . .
 # Открываем порт FastAPI
 EXPOSE 8000
 
-# По умолчанию запускаем FastAPI + webhook
-CMD ["uvicorn", "webapp:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run FastAPI in webhook mode without HTTP access logs
+CMD ["uvicorn", "webapp:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
