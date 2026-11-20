@@ -159,7 +159,7 @@ uvicorn webapp:app --host 0.0.0.0 --port 8000
 
 The server exposes the following endpoints:
 
-- `POST /webhook` — receives Telegram updates sent by the Telegram API
+- `POST /webhook/<WEBHOOK_SECRET>` — receives Telegram updates when a secret is configured (otherwise `POST /webhook`)
 - `GET /health` — health check endpoint for cloud platforms
 
 This mode is recommended for:
@@ -183,6 +183,109 @@ Webhook URL example:
 https://your-domain.com/webhook/my-super-secret-token
 ```
 In this case, Telegram will only send updates to the correct secret URL.
+
+## Deploy to Render (Docker + Deepgram)
+
+BubbleVoice can be deployed to Render as a Docker-based FastAPI service. The cloud version uses Telegram webhooks and Deepgram for speech-to-text transcription, so the bot can run without a local computer.
+
+### 1. Create a Render web service
+
+1. Push the project to a GitHub repository.
+2. Open [Render Dashboard](https://dashboard.render.com/) and select **New → Web Service**.
+3. Connect the GitHub repository.
+4. Configure the service:
+   - **Language:** Docker
+   - **Branch:** `main`
+   - **Instance type:** Free (if available)
+   - **Dockerfile path:** `./Dockerfile`
+   - **Health check path:** `/health`
+
+The Dockerfile installs Python dependencies and ffmpeg, then starts the FastAPI application with Uvicorn.
+
+### 2. Configure environment variables
+
+Add these variables in **Render → Environment**:
+
+```env
+BOT_TOKEN=your_telegram_bot_token
+DG_API_KEY=your_deepgram_api_key
+TRANSCRIBER_BACKEND=deepgram
+WEBHOOK_SECRET=your_random_secret
+LOG_LEVEL=INFO
+```
+
+Generate a webhook secret using Python:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Do not commit real tokens, API keys, or webhook secrets to Git. The `.env` and `.env.docker` files are excluded from version control.
+
+The Docker image already includes ffmpeg, so `FFMPEG_PATH` can be left unset.
+
+### 3. Deploy and check the service
+
+Deploy the service and wait for the **Live** status.
+
+Open the health check endpoint:
+
+```text
+https://your-service.onrender.com/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+A `404 Not Found` response at `/` is expected because the application does not define a root endpoint.
+
+### 4. Register the Telegram webhook
+
+Telegram must know where to send incoming messages.
+
+Set the webhook using the Telegram Bot API:
+
+```text
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook
+```
+
+Send a POST request with the following form field:
+
+```text
+url=https://your-service.onrender.com/webhook/<WEBHOOK_SECRET>
+```
+
+Replace the placeholders with your actual configuration values. Avoid exposing tokens and secrets in public logs, screenshots, or shared command output.
+
+When `WEBHOOK_SECRET` is configured, the application uses `POST /webhook/<WEBHOOK_SECRET>` instead of the public `POST /webhook` endpoint.
+
+If you change the secret, update the Render environment variable, redeploy the service, and register the new webhook URL with Telegram.
+
+### 5. Test the bot
+
+Send a voice message to your Telegram bot.
+
+The expected processing flow is:
+
+Telegram → FastAPI webhook → ffmpeg → Deepgram → Telegram transcription reply.
+
+You can inspect application logs in the Render dashboard to diagnose processing errors.
+
+### Free hosting limitations
+
+Render's Free web services may spin down after inactivity. The next request can take additional time while the service starts again, which may delay Telegram webhook processing. Free hosting is therefore suitable for demonstrations and portfolio projects, but it does not guarantee instant responses or uninterrupted availability.
+
+Deepgram usage is subject to its own pricing and account limits.
+
+### Local development vs. cloud deployment
+
+- **Local:** `python main.py` uses Telegram polling and can run Whisper locally.
+- **Cloud:** Docker starts `webapp.py` through Uvicorn, receives Telegram webhooks, and uses Deepgram.
+
+Avoid running polling and webhook consumers simultaneously for the same Telegram bot token.
 
 ## Notes
 
