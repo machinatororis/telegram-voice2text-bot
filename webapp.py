@@ -31,7 +31,7 @@ if not check_ffmpeg_available(settings.ffmpeg_path):
 
 if getattr(settings, "webhook_secret", None):
     WEBHOOK_PATH = f"/webhook/{settings.webhook_secret}"
-    logger.info("Using secret webhook path: %s", WEBHOOK_PATH)
+    logger.info("Using secret webhook path (value hidden)")
 else:
     WEBHOOK_PATH = "/webhook"
     logger.warning(
@@ -65,8 +65,7 @@ async def on_startup():
 @app.get("/health")
 async def health():
     """
-    Простой healthcheck для платформы деплоя.
-    Например, justrunmy.app, Railway, Fly.io и т.п.
+    Health check endpoint for cloud hosting platforms.
     """
     return {"status": "ok"}
 
@@ -78,8 +77,8 @@ async def telegram_webhook(request: Request):
     """
     data = await request.json()
 
-    # Легкий лог, чтобы видеть "сырые" апдейты (на первое время)
-    logger.debug("Received update from Telegram: %s", data)
+    # Log the incoming update without exposing message contents
+    logger.debug("Received Telegram update")
 
     # Превращаем JSON в объект Update из aiogram
     update = Update.model_validate(data)
