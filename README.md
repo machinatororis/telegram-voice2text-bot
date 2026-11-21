@@ -76,6 +76,20 @@ Create a ```.env``` file in the project root (it is ignored by git).
 
 You can use ```.env.example``` as a starting point.
 
+## Language selection and persistence
+
+Use `/start` or `/language` to select English, Ukrainian, or Russian. The text echo and voice responses use the chosen interface language.
+
+Language preferences are stored in SQLite at `data/user_languages.sqlite3` by default. You can override the location with `LANGUAGE_DB_PATH`. The directory will be created automatically. Local preference files are ignored by Git.
+
+**Important for Render / container hosting:** The default filesystem is ephemeral. Without a mounted persistent disk (or an external database), saved language settings will be lost during container recreation/redeployment. Point `LANGUAGE_DB_PATH` at a persistent mounted volume to keep the same SQLite file. If your Render plan does not provide persistent storage, this local SQLite approach does **not** guarantee persistence across deployments; use an external data store for that guarantee. Multiple app replicas should use a shared database rather than separate SQLite files.
+
+Run the language regression tests without an API token or audio dependencies:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
 ## Transcription backends
 
 BubbleVoice supports multiple speech-to-text backends.

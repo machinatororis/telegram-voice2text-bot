@@ -1,29 +1,65 @@
 # app/i18n.py
 from __future__ import annotations
 
-from typing import Dict, Literal
+import os
+import sqlite3
+from contextlib import closing
+from pathlib import Path
+from typing import Literal
 
 LangCode = Literal["en", "ru", "uk"]
 
 SUPPORTED_LANGS: tuple[LangCode, ...] = ("en", "ru", "uk")
 DEFAULT_LANG: LangCode = "en"
 
-# Temporary in-memory storage: user_id -> language code
-_user_language: Dict[int, LangCode] = {}
+
+def _connect_language_db() -> sqlite3.Connection:
+    """Open the language store, creating it when first needed."""
+    configured_path = os.getenv("LANGUAGE_DB_PATH")
+    db_path = (
+        Path(configured_path).expanduser()
+        if configured_path
+        else Path(__file__).resolve().parent.parent / "data" / "user_languages.sqlite3"
+    )
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    connection = sqlite3.connect(db_path, timeout=10)
+    try:
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS user_languages "
+            "(user_id INTEGER PRIMARY KEY, lang TEXT NOT NULL)"
+        )
+    except Exception:
+        connection.close()
+        raise
+    return connection
 
 
 def set_user_language(user_id: int, lang: LangCode) -> None:
-    """Set user's preferred language."""
+    """Persist the user's language across bot restarts."""
     if lang not in SUPPORTED_LANGS:
         lang = DEFAULT_LANG
-    _user_language[user_id] = lang
+
+    with closing(_connect_language_db()) as connection, connection:
+        connection.execute(
+            "INSERT INTO user_languages (user_id, lang) VALUES (?, ?) "
+            "ON CONFLICT(user_id) DO UPDATE SET lang = excluded.lang",
+            (user_id, lang),
+        )
 
 
 def get_user_language(user_id: int | None) -> LangCode:
-    """Get user's preferred language. Defaults to English."""
+    """Read the selected language, or English if none was saved."""
     if user_id is None:
         return DEFAULT_LANG
-    return _user_language.get(user_id, DEFAULT_LANG)
+
+    with closing(_connect_language_db()) as connection:
+        row = connection.execute(
+            "SELECT lang FROM user_languages WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+
+    return row[0] if row and row[0] in SUPPORTED_LANGS else DEFAULT_LANG
 
 
 MESSAGES: dict[str, dict[LangCode, str]] = {
