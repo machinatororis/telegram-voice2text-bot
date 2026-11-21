@@ -62,6 +62,12 @@ async def on_startup():
     )
 
 
+@app.get("/")
+async def root():
+    """Return a simple service status at the root URL."""
+    return {"service": "BubbleVoice", "status": "running"}
+
+
 @app.get("/health")
 async def health():
     """
