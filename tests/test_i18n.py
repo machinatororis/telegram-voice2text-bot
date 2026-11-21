@@ -1,6 +1,7 @@
 """Regression tests for language selection and echo translations (Issue #30)."""
 
-import importlib
+import subprocess
+import sys
 import os
 import tempfile
 import unittest
@@ -45,11 +46,44 @@ class LanguagePersistenceTests(unittest.TestCase):
         i18n.set_user_language(123, "uk")
         self.assertEqual(i18n.t(123, "echo_reply", text="тест"), "Ти написав(ла): тест")
 
-    def test_language_survives_module_reload(self):
+    def test_language_survives_fresh_python_process(self):
+        """The same durable SQLite path is readable by a newly started process."""
         i18n.set_user_language(123, "ru")
-        importlib.reload(i18n)  # Simulates a fresh application process.
-        self.assertEqual(i18n.get_user_language(123), "ru")
-        self.assertEqual(i18n.t(123, "echo_reply", text="привет"), "Ты написал(а): привет")
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from app.i18n import t; print(t(123, 'echo_reply', text='привет'))",
+            ],
+            cwd=Path(__file__).resolve().parent.parent,
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(process.stdout.strip(), "Ты написал(а): привет")
+
+    def test_new_container_without_shared_storage_loses_language(self):
+        """Document the known limitation of ephemeral container filesystems."""
+        i18n.set_user_language(123, "ru")
+
+        new_container_path = Path(self.temp_dir.name) / "new-container" / "preferences.sqlite3"
+        new_env = os.environ.copy()
+        new_env["LANGUAGE_DB_PATH"] = str(new_container_path)
+
+        process = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from app.i18n import t; print(t(123, 'echo_reply', text='привет'))",
+            ],
+            cwd=Path(__file__).resolve().parent.parent,
+            env=new_env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertEqual(process.stdout.strip(), "You wrote: привет")
 
     def test_user_preferences_are_isolated(self):
         i18n.set_user_language(123, "ru")
